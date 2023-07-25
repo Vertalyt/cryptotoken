@@ -43,7 +43,10 @@
               />
             </div>
 
-            <div v-if="matchedCoins.length" class="flex bg-white shadow-md p-1 rounded-md flex-wrap">
+            <div
+              v-if="matchedCoins.length"
+              class="flex bg-white shadow-md p-1 rounded-md flex-wrap"
+            >
               <span
                 v-for="t in matchedCoins"
                 :key="t.Symbol"
@@ -54,11 +57,13 @@
               </span>
             </div>
 
-            <div v-if="isTickerAlreadyAdded" class="text-sm text-red-600">Такой тикер уже добавлен</div>
+            <div v-if="isTickerAlreadyAdded" class="text-sm text-red-600">
+              Такой тикер уже добавлен
+            </div>
           </div>
         </div>
         <button
-          @click.prevent ="addTicker"
+          @click.prevent="addTicker"
           type="button"
           class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
         >
@@ -104,7 +109,7 @@
             v-for="t in filteredCryptoList"
             :key="t"
             @click="select(t)"
-            :class="{ 'border-4': selectedTicker === t }"
+            :class="{ 'border-4': coinDataGraph === t }"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer border-radius"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
@@ -138,17 +143,19 @@
         <hr class="w-full border-t border-gray-600 my-4" />
       </template>
 
-      <section v-if="selectedTicker && tickerList.length" class="relative">
-        <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">{{ selectedTicker.name }} - USD</h3>
+      <section v-if="coinDataGraph && tickerList.length" class="relative">
+        <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
+          {{ coinDataGraph.name }} - USD
+        </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div
-            v-for="(bar, idx) in normalizeGrapf()"
+            v-for="(bar, idx) in normalizedGraph"
             :key="idx"
             :style="{ height: `${bar}%` }"
             class="bg-purple-800 border w-10"
           ></div>
         </div>
-        <button @click="selectedTicker = null" type="button" class="absolute top-0 right-0">
+        <button @click="coinDataGraph = null" type="button" class="absolute top-0 right-0">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -177,43 +184,59 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { fetchCryptoPrice, fetchAllCryptoPrices } from './ui/fetchCryptoPrice'
 
 export default {
   setup() {
-    const selectedTicker = ref(null)
+    const coinDataGraph = ref(null)
     const tickerList = ref([])
     const inputTicket = ref('')
     const cryptoList = ref([])
     const matchedCoins = ref([])
     const graph = ref([])
     const isLoading = ref(false)
-    const isTickerAlreadyAdded = ref()
     const intervalId = ref()
     const filterText = ref('')
-    const filteredCryptoList = ref()
     const currentPage = ref(1)
-    const hasNextPage = ref(true)
-    const filterIncludes = ref()
-    const start = ref((currentPage.value - 1) * 6)
-    const end = ref(currentPage.value * 6)
-    
+
+    const filterIncludes = computed(() => {
+      return tickerList.value.filter((t) => t.name.includes(filterText.value))
+    })
+
+    const currentPageData = computed(() => {
+      const start = (currentPage.value - 1) * 6
+      const end = currentPage.value * 6
+      return { start, end }
+    })
+
+    const filteredCryptoList = computed(() => {
+      return filterIncludes.value.slice(currentPageData.value.start, currentPageData.value.end)
+    })
+
+    const normalizedGraph = computed(() => {
+      const max = Math.max(...graph.value)
+      const min = Math.min(...graph.value)
+      const difference = max - min
+      return graph.value.map((price) => 5 + ((price - min) * 95) / difference)
+    })
+
+    const isTickerAlreadyAdded = computed(() => {
+      return tickerList.value.some((t) => t.name === inputTicket.value)
+    })
+    const hasNextPage = computed(() => {
+      return currentPageData.value.end < filterIncludes.value.length
+    })
+
     function subscribeToPriceUpdates(nameTiker) {
       intervalId.value = setInterval(async () => {
         const rezult = await fetchCryptoPrice(nameTiker)
         tickerList.value.find((t) => t.name === nameTiker).price =
           rezult.USD > 1 ? rezult.USD.toFixed(2) : rezult.USD.toPrecision(2)
-        if (selectedTicker.value?.name === nameTiker) {
+        if (coinDataGraph.value?.name === nameTiker) {
           graph.value.push(rezult.USD)
         }
       }, 10000)
-    }
-
-    function filtercryptoList() {
-        filterIncludes.value = tickerList.value.filter((t) => t.name.includes(filterText.value))
-        filteredCryptoList.value = filterIncludes.value.slice(start.value, end.value)
-        hasNextPage.value = end.value < filterIncludes.value.length
     }
 
     const addTicker = () => {
@@ -221,19 +244,20 @@ export default {
         name: inputTicket.value,
         price: '-'
       }
-      isTickerAlreadyAdded.value = tickerList.value.find((t) => t.name === currentTicker.name) !== undefined
-         if (!isTickerAlreadyAdded.value) {
-       //   subscribeToPriceUpdates(currentTicker.name)
 
-          tickerList.value.push(currentTicker)
-
+      if (!isTickerAlreadyAdded.value) {
+        //   subscribeToPriceUpdates(currentTicker.name)
+        tickerList.value.push(currentTicker)
         localStorage.setItem('cryptonomicon', JSON.stringify(tickerList.value))
-        filtercryptoList()
+
         inputTicket.value = ''
         matchedCoins.value = ''
         filterText.value = ''
-        currentPage.value = 1
-         }
+      }
+
+      if (filteredCryptoList.value.length === 6 && filterIncludes.value.length % 6 !== 0) {
+        currentPage.value += 1
+      }
     }
 
     function addInput(t) {
@@ -241,51 +265,43 @@ export default {
       addTicker()
     }
 
-    function normalizeGrapf() {
-      const max = Math.max(...graph.value)
-      const min = Math.min(...graph.value)
-      const difference = max - min
-      return graph.value.map((price) => 5 + ((price - min) * 95) / difference)
-    }
-
     const select = (ticker) => {
-      selectedTicker.value = ticker
+      coinDataGraph.value = ticker
       graph.value = []
     }
 
     onMounted(async () => {
       isLoading.value = true
       const windowData = Object.fromEntries(new URL(window.location).searchParams.entries())
-    
-      if(windowData.filterText)
-       { filterText.value = windowData.filterText  }
-
-       if(windowData.currentPage)
-       { currentPage.value = windowData.currentPage  }
-
+      if (windowData.filterText) {
+        filterText.value = windowData.filterText
+      }
+      if (windowData.currentPage) {
+        currentPage.value = windowData.currentPage
+      }
 
       cryptoList.value = await fetchAllCryptoPrices()
 
       tickerList.value = JSON.parse(localStorage.getItem('cryptonomicon')) || []
       if (tickerList.value.length) {
         tickerList.value.map((t) => {
-        //  subscribeToPriceUpdates(t.name)
+          //  subscribeToPriceUpdates(t.name)
         })
-        filtercryptoList()
       }
       isLoading.value = false
     })
 
-    
-    watch([tickerList, filterText, currentPage], (val) => {
-      start.value = (val[2] - 1) * 6
-      end.value = val[2] * 6
-      filtercryptoList()    
+    watch(filteredCryptoList, () => {
+      if (filteredCryptoList.value.length === 0 && currentPage.value > 1) {
+        currentPage.value -= 1
+      }
     })
+
+
 
     function queriFilter() {
       let filter = ''
-      if(filterText.value) {
+      if (filterText.value) {
         filter = `&filterText=${filterText.value}`
       }
       window.history.pushState(
@@ -293,14 +309,13 @@ export default {
         document.title,
         `${window.location.pathname}?page=${currentPage.value}${filter}`
       )
-    } 
+    }
 
-
-    watch(currentPage, val => {
+    watch(currentPage, () => {
       queriFilter()
     })
 
-    watch(filterText, val => {
+    watch(filterText, () => {
       currentPage.value = 1
       queriFilter()
     })
@@ -324,7 +339,10 @@ export default {
     const isDeleted = (t) => {
       tickerList.value = tickerList.value.filter((ticker) => ticker !== t)
       localStorage.setItem('cryptonomicon', JSON.stringify(tickerList.value))
-      filtercryptoList()
+      //  filtercryptoList()
+      if(coinDataGraph.value.name === t.name) {
+        coinDataGraph.value = null
+      }
     }
 
     onBeforeUnmount(() => {
@@ -336,9 +354,9 @@ export default {
       isDeleted,
       inputTicket,
       addTicker,
-      selectedTicker,
+      coinDataGraph,
       graph,
-      normalizeGrapf,
+      normalizedGraph,
       select,
       inputUp,
       isLoading,
@@ -348,7 +366,7 @@ export default {
       filterText,
       filteredCryptoList,
       currentPage,
-      hasNextPage,
+      hasNextPage
     }
   }
 }
