@@ -35,6 +35,7 @@
               <input
                 v-model="inputTicket"
                 @input="inputUp"
+                @keyup.enter="addTicker"
                 type="text"
                 name="wallet"
                 id="wallet"
@@ -51,6 +52,7 @@
                 v-for="t in matchedCoins"
                 :key="t.Symbol"
                 @click="addInput(t.Symbol)"
+                @keyup.enter="addInput(t.Symbol)"
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
               >
                 {{ t.Symbol }}
@@ -63,7 +65,7 @@
           </div>
         </div>
         <button
-          @click.prevent="addTicker"
+          @click="addTicker"
           type="button"
           class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
         >
@@ -115,7 +117,7 @@
             <div class="px-4 py-5 sm:p-6 text-center">
               <dt class="text-sm font-medium text-gray-500 truncate">{{ t.name }} - USD</dt>
               <dd class="mt-1 text-3xl font-semibold text-gray-900">
-                {{ t.price }}
+                {{ normalizePrice(t.price) }}
               </dd>
             </div>
             <div class="w-full border-t border-gray-200"></div>
@@ -185,7 +187,7 @@
 
 <script>
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
-import { fetchCryptoPrice, fetchAllCryptoPrices } from './ui/fetchCryptoPrice'
+import { fetchAllCryptoPrices, subscribeToTickers, unSsubscribeFromTicker } from './ui/fetchCryptoPrice'
 
 export default {
   setup() {
@@ -199,6 +201,40 @@ export default {
     const intervalId = ref()
     const filterText = ref('')
     const currentPage = ref(1)
+
+
+
+
+    onMounted(async () => {
+      isLoading.value = true
+      const windowData = Object.fromEntries(new URL(window.location).searchParams.entries())
+      if (windowData.filterText) {
+        filterText.value = windowData.filterText
+      }
+      if (windowData.page) {
+        currentPage.value = windowData.page
+      }
+      // cryptoList.value = await fetchAllCryptoPrices()
+
+      const tickersData = localStorage.getItem('cryptonomicon') || []
+
+      if(tickersData) {
+        tickerList.value = JSON.parse(tickersData)
+        tickerList.value.forEach(ticker => {
+        subscribeToTickers(ticker.name, (newPrice) => updateTicker(ticker.name, newPrice))
+      })
+      }
+
+      isLoading.value = false
+    })
+
+    const updateTicker = (tickerName, price) => {
+    tickerList.value.filter(t => t.name === tickerName).forEach( t => t.price = price )
+    if (coinDataGraph.value) {
+            const nameTiker = tickerList.value.find((t) => t === coinDataGraph.value)
+            graph.value.push(nameTiker.price)
+          }
+    }
 
     const filterIncludes = computed(() => {
       return tickerList.value.filter((t) => t.name.includes(filterText.value))
@@ -218,6 +254,9 @@ export default {
       const max = Math.max(...graph.value)
       const min = Math.min(...graph.value)
       const difference = max - min
+      if (max === min) {
+        return graph.value.map(() => 5)
+      }
       return graph.value.map((price) => 5 + ((price - min) * 95) / difference)
     })
 
@@ -228,26 +267,65 @@ export default {
       return currentPageData.value.end < filterIncludes.value.length
     })
 
-    function subscribeToPriceUpdates(nameTiker) {
-      intervalId.value = setInterval(async () => {
-        const rezult = await fetchCryptoPrice(nameTiker)
-        tickerList.value.find((t) => t.name === nameTiker).price =
-          rezult.USD > 1 ? rezult.USD.toFixed(2) : rezult.USD.toPrecision(2)
-        if (coinDataGraph.value?.name === nameTiker) {
-          graph.value.push(rezult.USD)
-        }
-      }, 10000)
+    const queriedFilter = computed(() => {
+      return {
+        filterText: filterText.value,
+        currentPage: currentPage.value
+      }
+    })
+
+
+    function normalizePrice(prise) {
+      if(typeof prise === 'number') {
+        return prise > 1 ? prise.toFixed(2) : prise.toPrecision(2)
+      } else {
+        return prise
+      }
     }
+
+    watch(coinDataGraph, () => {
+      graph.value = []
+    })
+
+
+    watch(filteredCryptoList, () => {
+      if (filteredCryptoList.value.length === 0 && currentPage.value > 1) {
+        currentPage.value -= 1
+      }
+    })
+
+    watch(queriedFilter, (val) => {
+      let filter = ''
+      if (val.filterText) {
+        filter = `&filterText=${val.filterText}`
+      }
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?page=${val.currentPage}${filter}`
+      )
+    })
+
+    watch(filterText, () => {
+      currentPage.value = 1
+      if(coinDataGraph.value && !coinDataGraph.value.name.includes(filterText.value)) {
+          graph.value = []
+          coinDataGraph.value = null
+      }
+    })
+
 
     const addTicker = () => {
       const currentTicker = {
-        name: inputTicket.value,
+        name: inputTicket.value.toUpperCase() ,
         price: '-'
       }
 
       if (!isTickerAlreadyAdded.value) {
-        //   subscribeToPriceUpdates(currentTicker.name)
-        tickerList.value.push(currentTicker)
+        tickerList.value = [...tickerList.value, currentTicker]
+        
+        subscribeToTickers(currentTicker.name, (newPrice) => updateTicker(currentTicker.name, newPrice))
+
         localStorage.setItem('cryptonomicon', JSON.stringify(tickerList.value))
 
         inputTicket.value = ''
@@ -267,58 +345,7 @@ export default {
 
     const select = (ticker) => {
       coinDataGraph.value = ticker
-      graph.value = []
     }
-
-    onMounted(async () => {
-      isLoading.value = true
-      const windowData = Object.fromEntries(new URL(window.location).searchParams.entries())
-      if (windowData.filterText) {
-        filterText.value = windowData.filterText
-      }
-      if (windowData.currentPage) {
-        currentPage.value = windowData.currentPage
-      }
-
-      cryptoList.value = await fetchAllCryptoPrices()
-
-      tickerList.value = JSON.parse(localStorage.getItem('cryptonomicon')) || []
-      if (tickerList.value.length) {
-        tickerList.value.map((t) => {
-          //  subscribeToPriceUpdates(t.name)
-        })
-      }
-      isLoading.value = false
-    })
-
-    watch(filteredCryptoList, () => {
-      if (filteredCryptoList.value.length === 0 && currentPage.value > 1) {
-        currentPage.value -= 1
-      }
-    })
-
-
-
-    function queriFilter() {
-      let filter = ''
-      if (filterText.value) {
-        filter = `&filterText=${filterText.value}`
-      }
-      window.history.pushState(
-        null,
-        document.title,
-        `${window.location.pathname}?page=${currentPage.value}${filter}`
-      )
-    }
-
-    watch(currentPage, () => {
-      queriFilter()
-    })
-
-    watch(filterText, () => {
-      currentPage.value = 1
-      queriFilter()
-    })
 
     const inputUp = () => {
       if (inputTicket.value.length > 1) {
@@ -336,14 +363,18 @@ export default {
       }
     }
 
-    const isDeleted = (t) => {
-      tickerList.value = tickerList.value.filter((ticker) => ticker !== t)
+    const isDeleted = (tickerToRemove) => {
+      tickerList.value = tickerList.value.filter((ticker) => ticker !== tickerToRemove)
       localStorage.setItem('cryptonomicon', JSON.stringify(tickerList.value))
       //  filtercryptoList()
-      if(coinDataGraph.value.name === t.name) {
+
+      if (coinDataGraph.value?.name === tickerToRemove.name) {
         coinDataGraph.value = null
       }
+      unSsubscribeFromTicker(tickerToRemove.name)
     }
+
+
 
     onBeforeUnmount(() => {
       clearInterval(intervalId.value)
@@ -366,7 +397,8 @@ export default {
       filterText,
       filteredCryptoList,
       currentPage,
-      hasNextPage
+      hasNextPage,
+      normalizePrice
     }
   }
 }
