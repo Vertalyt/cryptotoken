@@ -111,7 +111,7 @@
             v-for="t in filteredCryptoList"
             :key="t"
             @click="select(t)"
-            :class="{ 'border-4': coinDataGraph === t }"
+            :class="{ 'border-4': coinDataGraph === t, 'bg-red-100' : t.notPriseCoin }"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer border-radius"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
@@ -203,8 +203,6 @@ export default {
     const currentPage = ref(1)
 
 
-
-
     onMounted(async () => {
       isLoading.value = true
       const windowData = Object.fromEntries(new URL(window.location).searchParams.entries())
@@ -216,24 +214,29 @@ export default {
       }
       // cryptoList.value = await fetchAllCryptoPrices()
 
-      const tickersData = localStorage.getItem('cryptonomicon') || []
+      const tickersData = localStorage.getItem('cryptonomicon')
 
       if(tickersData) {
         tickerList.value = JSON.parse(tickersData)
         tickerList.value.forEach(ticker => {
-        subscribeToTickers(ticker.name, (newPrice) => updateTicker(ticker.name, newPrice))
+        subscribeToTickers(ticker.name, (newPrice) => updateTicker(ticker.name, newPrice.price, newPrice.notPriseCoin))
       })
+
       }
 
       isLoading.value = false
     })
 
-    const updateTicker = (tickerName, price) => {
-    tickerList.value.filter(t => t.name === tickerName).forEach( t => t.price = price )
+    const updateTicker = (tickerName, price, notPriseCoin) => {
+    tickerList.value.filter(t => t.name === tickerName).forEach(t => {
+      t.price = price 
+      t.notPriseCoin = notPriseCoin
+    })
     if (coinDataGraph.value) {
             const nameTiker = tickerList.value.find((t) => t === coinDataGraph.value)
             graph.value.push(nameTiker.price)
           }
+          tickerList.value = [...tickerList.value]
     }
 
     const filterIncludes = computed(() => {
@@ -314,17 +317,21 @@ export default {
       }
     })
 
+    watch(tickerList, () => {
+     localStorage.setItem('cryptonomicon', JSON.stringify(tickerList.value)) 
+    })
 
     const addTicker = () => {
       const currentTicker = {
         name: inputTicket.value.toUpperCase() ,
-        price: '-'
+        price: '-',
+        notPriseCoin: false
       }
 
       if (!isTickerAlreadyAdded.value) {
         tickerList.value = [...tickerList.value, currentTicker]
-        
-        subscribeToTickers(currentTicker.name, (newPrice) => updateTicker(currentTicker.name, newPrice))
+
+        subscribeToTickers(currentTicker.name, (newPrice) => updateTicker(currentTicker.name, newPrice.price, newPrice.notPriseCoin))
 
         localStorage.setItem('cryptonomicon', JSON.stringify(tickerList.value))
 
@@ -398,7 +405,7 @@ export default {
       filteredCryptoList,
       currentPage,
       hasNextPage,
-      normalizePrice
+      normalizePrice,
     }
   }
 }
