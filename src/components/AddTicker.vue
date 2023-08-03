@@ -43,13 +43,22 @@
 <script setup>
 import AddButton from './AddButton.vue'
 import { ref, onMounted, computed} from 'vue'
-
 import { fetchAllCryptoPrices } from '../ui/fetchCryptoPrice'
+
 const emit = defineEmits({
   add: value => typeof value === "string"
 })
 // eslint-disable-next-line no-unused-vars
-const props = defineProps(['isDuplicateCoin', 'tooMaxCoin'])
+const props = defineProps({
+  isDuplicateCoin: {
+    type: Boolean,
+    requared: true
+  },
+  tooMaxCoin: {
+    type: Boolean,
+    requared: true
+  },
+ })
 const inputTicket = ref('')
 const cryptoList = ref([])
 const matchedCoins = ref([])
