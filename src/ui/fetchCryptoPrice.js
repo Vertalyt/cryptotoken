@@ -6,14 +6,13 @@ const AGGREGATE_INDEX = '5'
 const INVALID_SUB = '500'
 
 
-
 socket.addEventListener('message', (e) => {
   const { TYPE: type, FROMSYMBOL: currency, PRICE: newPrice, PARAMETER: errorParametr } = JSON.parse(e.data);
 
   if (type === INVALID_SUB) {
     const splitResponse = errorParametr.split('~');
-    const notPriseCoinName = splitResponse[2];
-    const handlers = tickersHandllers.get(notPriseCoinName);
+    const currency = splitResponse[2];
+    const handlers = tickersHandllers.get(currency);
     if (handlers) {
       handlers.forEach((fn) => fn({ price: 'no price', notPriseCoin: true }));
     }
@@ -67,11 +66,11 @@ export const unSsubscribeFromTicker = (ticker) => {
 window.tickers = tickersHandllers
 
 export async function fetchAllCryptoPrices() {
-  const response = await fetch(`https://min-api.cryptocompare.com/data/all/cryptoList?summary=true`)
+  const response = await fetch(`https://min-api.cryptocompare.com/data/blockchain/list?api_key=${API_Key}`)
   if (response.ok) {
     const data = await response.json()
-    const coinsArray = Object.values(data.Data)
-    return coinsArray
+   const coinsArray = Object.values(data.Data)
+   return coinsArray
   } else {
     alert('Ошибка HTTP: ' + response.status)
   }

@@ -1,94 +1,16 @@
 <template>
   <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
-    <div
-      v-if="isLoading"
-      class="fixed w-100 h-100 opacity-80 bg-purple-800 inset-0 z-50 flex items-center justify-center"
-    >
-      <svg
-        class="animate-spin -ml-1 mr-3 h-12 w-12 text-white"
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-      >
-        <circle
-          class="opacity-25"
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          stroke-width="4"
-        ></circle>
-        <path
-          class="opacity-75"
-          fill="currentColor"
-          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-        ></path>
-      </svg>
-    </div>
-
+ 
     <div class="container">
-      <section>
-        <div class="flex">
-          <div class="max-w-xs">
-            <label for="wallet" class="block text-sm font-medium text-gray-700">Тикер</label>
-            <div class="mt-1 relative rounded-md shadow-md">
-              <input
-                v-model="inputTicket"
-                @input="inputUp"
-                @keyup.enter="addTicker"
-                type="text"
-                name="wallet"
-                id="wallet"
-                class="block w-full pr-10 border-gray-300 text-gray-900 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-md"
-                placeholder="Например DOGE"
-              />
-            </div>
+      <div class="w-full my-4"></div>
 
-            <div
-              v-if="matchedCoins.length"
-              class="flex bg-white shadow-md p-1 rounded-md flex-wrap"
-            >
-              <span
-                v-for="t in matchedCoins"
-                :key="t.Symbol"
-                @click="addInput(t.Symbol)"
-                @keyup.enter="addInput(t.Symbol)"
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                {{ t.Symbol }}
-              </span>
-            </div>
-
-            <div v-if="isTickerAlreadyAdded" class="text-sm text-red-600">
-              Такой тикер уже добавлен
-            </div>
-          </div>
-        </div>
-        <button
-          @click="addTicker"
-          type="button"
-          class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-        >
-          <svg
-            class="-ml-0.5 mr-2 h-6 w-6"
-            xmlns="http://www.w3.org/2000/svg"
-            width="30"
-            height="30"
-            viewBox="0 0 24 24"
-            fill="#ffffff"
-          >
-            <path
-              d="M13 7h-2v4H7v2h4v4h2v-4h4v-2h-4V7zm-1-5C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"
-            ></path>
-          </svg>
-          Добавить
-        </button>
-      </section>
+      <AddTicker @add="addTicker" :isDuplicateCoin="isDuplicateCoin" :tooMaxCoin="tooMaxCoin"/>
 
       <template v-if="tickerList.length">
         <hr class="w-full border-t border-gray-600 my-4" />
 
-        <button
+        <div>
+          <button
           v-if="currentPage > 1"
           @click="currentPage = currentPage - 1"
           class="my-4 mx-2 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
@@ -102,6 +24,9 @@
         >
           Вперед
         </button>
+        </div>
+
+
         <div>Фильтр: <input v-model="filterText" /></div>
 
         <hr class="w-full border-t border-gray-600 my-4" />
@@ -111,8 +36,12 @@
             v-for="t in filteredCryptoList"
             :key="t"
             @click="select(t)"
-            :class="{ 'border-4': coinDataGraph === t, 'bg-red-100' : t.notPriseCoin }"
-            class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer border-radius"
+            :class="{
+              'bg-red-100': t.notPriseCoin,
+              'bg-white': !t.notPriseCoin,
+              'border-4': coinDataGraph === t
+            }"
+            class="overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer border-radius"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
               <dt class="text-sm font-medium text-gray-500 truncate">{{ t.name }} - USD</dt>
@@ -149,12 +78,13 @@
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
           {{ coinDataGraph.name }} - USD
         </h3>
-        <div class="flex items-end border-gray-600 border-b border-l h-64">
+        <div class="flex items-end border-gray-600 border-b border-l h-64" ref="refGraph">
           <div
             v-for="(bar, idx) in normalizedGraph"
+            ref="refGraphWidth"
             :key="idx"
-            :style="{ height: `${bar}%` }"
-            class="bg-purple-800 border w-10"
+            :style="{ height: `${bar}%`, width: `${refGraphWidthCullomn}px` }"
+            class="bg-purple-800 border"
           ></div>
         </div>
         <button @click="coinDataGraph = null" type="button" class="absolute top-0 right-0">
@@ -181,30 +111,42 @@
           </svg>
         </button>
       </section>
+
+      <AppLoading v-if="isLoading" />
     </div>
   </div>
+
+
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
-import { fetchAllCryptoPrices, subscribeToTickers, unSsubscribeFromTicker } from './ui/fetchCryptoPrice'
+import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
+import { subscribeToTickers, unSsubscribeFromTicker } from './ui/fetchCryptoPrice'
+import AddTicker from './components/AddTicker.vue'
+import AppLoading from './components/AppLoading.vue'
 
 export default {
   setup() {
     const coinDataGraph = ref(null)
     const tickerList = ref([])
-    const inputTicket = ref('')
-    const cryptoList = ref([])
-    const matchedCoins = ref([])
     const graph = ref([])
     const isLoading = ref(false)
     const intervalId = ref()
     const filterText = ref('')
     const currentPage = ref(1)
-
+    const refGraph = ref(null)
+    const maxGraphElement = ref(1)
+    const refGraphWidthCullomn = 40
+    const isDuplicateCoin = ref(false)
+    const tooMaxCoin = ref(false)
 
     onMounted(async () => {
       isLoading.value = true
+      window.addEventListener('resize', () => {
+        calculateMaxGrapgElevent()
+        changeMaxElementsGraph()
+      })
+
       const windowData = Object.fromEntries(new URL(window.location).searchParams.entries())
       if (windowData.filterText) {
         filterText.value = windowData.filterText
@@ -212,31 +154,34 @@ export default {
       if (windowData.page) {
         currentPage.value = windowData.page
       }
-      // cryptoList.value = await fetchAllCryptoPrices()
 
       const tickersData = localStorage.getItem('cryptonomicon')
 
-      if(tickersData) {
+      if (tickersData) {
         tickerList.value = JSON.parse(tickersData)
-        tickerList.value.forEach(ticker => {
-        subscribeToTickers(ticker.name, (newPrice) => updateTicker(ticker.name, newPrice.price, newPrice.notPriseCoin))
-      })
-
+        tickerList.value.forEach((ticker) => {
+          subscribeToTickers(ticker.name, (newPrice) =>
+            updateTicker(ticker.name, newPrice.price, newPrice.notPriseCoin)
+          )
+        })
       }
-
       isLoading.value = false
     })
 
+
     const updateTicker = (tickerName, price, notPriseCoin) => {
-    tickerList.value.filter(t => t.name === tickerName).forEach(t => {
-      t.price = price 
-      t.notPriseCoin = notPriseCoin
-    })
-    if (coinDataGraph.value) {
-            const nameTiker = tickerList.value.find((t) => t === coinDataGraph.value)
-            graph.value.push(nameTiker.price)
-          }
-          tickerList.value = [...tickerList.value]
+      tickerList.value
+        .filter((t) => t.name === tickerName)
+        .forEach((t) => {
+          t.price = price
+          t.notPriseCoin = notPriseCoin
+        })
+      if (coinDataGraph.value) {
+        const nameTiker = tickerList.value.find((t) => t === coinDataGraph.value)
+        graph.value.push(nameTiker.price)
+        changeMaxElementsGraph()
+      }
+      tickerList.value = [...tickerList.value]
     }
 
     const filterIncludes = computed(() => {
@@ -263,9 +208,6 @@ export default {
       return graph.value.map((price) => 5 + ((price - min) * 95) / difference)
     })
 
-    const isTickerAlreadyAdded = computed(() => {
-      return tickerList.value.some((t) => t.name === inputTicket.value)
-    })
     const hasNextPage = computed(() => {
       return currentPageData.value.end < filterIncludes.value.length
     })
@@ -277,19 +219,38 @@ export default {
       }
     })
 
+    function changeMaxElementsGraph() {
+      if (graph.value.length > maxGraphElement.value) {
+        graph.value = graph.value.slice(-maxGraphElement.value)
+      }
+    }
+
+    function calculateMaxGrapgElevent() {
+      if (!refGraph.value) {
+        return
+      }
+      maxGraphElement.value = Math.floor(refGraph.value.offsetWidth / refGraphWidthCullomn)
+    }
 
     function normalizePrice(prise) {
-      if(typeof prise === 'number') {
+      if (typeof prise === 'number') {
         return prise > 1 ? prise.toFixed(2) : prise.toPrecision(2)
       } else {
         return prise
       }
     }
 
+    const select = (ticker) => {
+      coinDataGraph.value = ticker
+
+      nextTick(() => {
+        calculateMaxGrapgElevent()
+      })
+    }
+
     watch(coinDataGraph, () => {
       graph.value = []
     })
-
 
     watch(filteredCryptoList, () => {
       if (filteredCryptoList.value.length === 0 && currentPage.value > 1) {
@@ -311,62 +272,45 @@ export default {
 
     watch(filterText, () => {
       currentPage.value = 1
-      if(coinDataGraph.value && !coinDataGraph.value.name.includes(filterText.value)) {
-          graph.value = []
-          coinDataGraph.value = null
+      if (coinDataGraph.value && !coinDataGraph.value.name.includes(filterText.value)) {
+        graph.value = []
+        coinDataGraph.value = null
       }
     })
 
     watch(tickerList, () => {
-     localStorage.setItem('cryptonomicon', JSON.stringify(tickerList.value)) 
+      localStorage.setItem('cryptonomicon', JSON.stringify(tickerList.value))
+
+      tooMaxCoin.value = tickerList.value.length > 3
+
     })
 
-    const addTicker = () => {
+    
+    const addTicker = (ticker) => {
       const currentTicker = {
-        name: inputTicket.value.toUpperCase() ,
+        name: ticker.toUpperCase(),
         price: '-',
         notPriseCoin: false
       }
 
-      if (!isTickerAlreadyAdded.value) {
+      isDuplicateCoin.value = tickerList.value.some((t) => t.name.toUpperCase() === currentTicker.name)
+
+      if (!isDuplicateCoin.value) {
         tickerList.value = [...tickerList.value, currentTicker]
-
-        subscribeToTickers(currentTicker.name, (newPrice) => updateTicker(currentTicker.name, newPrice.price, newPrice.notPriseCoin))
-
+        subscribeToTickers(currentTicker.name, (newPrice) =>
+          updateTicker(currentTicker.name, newPrice.price, newPrice.notPriseCoin)
+        )
         localStorage.setItem('cryptonomicon', JSON.stringify(tickerList.value))
-
-        inputTicket.value = ''
-        matchedCoins.value = ''
         filterText.value = ''
       }
 
+      setTimeout(() => {
+        isDuplicateCoin.value = false
+        filterText.value = ''
+      }, 1000)
+
       if (filteredCryptoList.value.length === 6 && filterIncludes.value.length % 6 !== 0) {
         currentPage.value += 1
-      }
-    }
-
-    function addInput(t) {
-      inputTicket.value = t
-      addTicker()
-    }
-
-    const select = (ticker) => {
-      coinDataGraph.value = ticker
-    }
-
-    const inputUp = () => {
-      if (inputTicket.value.length > 1) {
-        if (cryptoList.value) {
-          const inputValue = inputTicket.value.toLowerCase()
-
-          let rezult = cryptoList.value.filter((c) => {
-            const symbol = c.Symbol.toLowerCase()
-            const fullName = c.FullName.toLowerCase()
-            return symbol.includes(inputValue) || fullName.includes(inputValue)
-          })
-          rezult.sort((a, b) => a.FullName.length - b.FullName.length)
-          matchedCoins.value = rezult.slice(0, 4)
-        }
       }
     }
 
@@ -381,32 +325,34 @@ export default {
       unSsubscribeFromTicker(tickerToRemove.name)
     }
 
-
-
     onBeforeUnmount(() => {
       clearInterval(intervalId.value)
+      window.removeEventListener('resize', calculateMaxGrapgElevent)
     })
 
     return {
       tickerList,
       isDeleted,
-      inputTicket,
       addTicker,
       coinDataGraph,
       graph,
       normalizedGraph,
       select,
-      inputUp,
       isLoading,
-      matchedCoins,
-      addInput,
-      isTickerAlreadyAdded,
+      isDuplicateCoin,
       filterText,
       filteredCryptoList,
       currentPage,
       hasNextPage,
       normalizePrice,
+      refGraph,
+      refGraphWidthCullomn,
+      tooMaxCoin
     }
+  },
+  components: {
+    AddTicker,
+    AppLoading
   }
 }
 </script>
