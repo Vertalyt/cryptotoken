@@ -77,7 +77,7 @@
         :graph="graph"
         :coinDataGraph="coinDataGraph"
         @rezetDataGraph="coinDataGraph = null"
-        @refGraph="calculateMaxGrapgElevent"
+        @maxElGraph="maxElGraph"
       />
 
       <AppLoading v-if="isLoading" />
@@ -102,9 +102,12 @@ export default {
     const currentPage = ref(1)
     const isDuplicateCoin = ref(false)
     const tooMaxCoin = ref(false)
-    const refGraphWidthCullomn = 40
     const maxelement = ref()
 
+    const maxElGraph = ((el) => {
+      maxelement.value = el
+      changeMaxElementsGraph()
+    } )
 
     onMounted(async () => {
       isLoading.value = true
@@ -149,16 +152,7 @@ export default {
     }
 
 
-    function calculateMaxGrapgElevent(refGraph) {
-      if (!refGraph) {
-        return
-      }
-      maxelement.value = Math.floor(refGraph / refGraphWidthCullomn)
-
-      changeMaxElementsGraph()
-    }
-
-    function changeMaxElementsGraph() {
+    const changeMaxElementsGraph = () => {
       if (graph.value.length > maxelement.value) {
         graph.value = graph.value.slice(-maxelement.value)
       }
@@ -292,8 +286,7 @@ export default {
       hasNextPage,
       normalizePrice,
       tooMaxCoin,
-      changeMaxElementsGraph,
-      calculateMaxGrapgElevent
+      maxElGraph
     }
   },
   components: {

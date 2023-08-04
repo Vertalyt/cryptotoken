@@ -49,27 +49,34 @@ const props = defineProps({
   },
   
 })
-const emit = defineEmits(['rezetDataGraph', 'refGraph'])
+const emit = defineEmits(['rezetDataGraph', 'maxElGraph'])
 
 const refGraph = ref(300)
 const refGraphWidthCullomn = 40
 
 
 onMounted(async () => {
-  emit('refGraph', refGraph.value.offsetWidth)
+  calculateMaxGrapgElevent()
 })
 
 window.addEventListener('resize', () => {
   if(refGraph.value.offsetWidth) {
-  emit('refGraph', refGraph.value.offsetWidth)
+    calculateMaxGrapgElevent()
   }
-
 })
 
+function calculateMaxGrapgElevent() {
+      if (!refGraph.value.offsetWidth) {
+        return
+      }
+     const maxelement = Math.floor(refGraph.value.offsetWidth / refGraphWidthCullomn)
+     emit('refGraph', maxelement)
+
+    }
 
 onBeforeUnmount(() => {
       window.removeEventListener('resize', () => {
-        emit('refGraph', refGraph.value.offsetWidth)
+        emit('maxElGraph', calculateMaxGrapgElevent())
       })
     })
 
